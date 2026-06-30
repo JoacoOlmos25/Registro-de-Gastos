@@ -1,65 +1,137 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import ExpenseForm from "@/components/ExpenseForm";
+import ExpenseList from "@/components/ExpenseList";
+import SummaryPanel from "@/components/SummaryPanel";
+import AnalyticsView from "@/components/AnalyticsView";
+import { Transaction } from "@/types";
+import { ListTodo, PieChart } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+type ViewMode = "operaciones" | "analisis";
 
 export default function Home() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [currentView, setCurrentView] = useState<ViewMode>("operaciones");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch initial data from Supabase
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("movimientos")
+          .select("*")
+          .order("fecha", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching transactions:", error);
+        } else {
+          setTransactions(data || []);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
+
+  const handleAddTransaction = async (newTransaction: Omit<Transaction, "id" | "creado_en">) => {
+    try {
+      // 1. Insert into Supabase
+      const { data, error } = await supabase
+        .from("movimientos")
+        .insert([newTransaction])
+        .select();
+
+      if (error) {
+        console.error("Error inserting transaction:", error);
+        alert("Hubo un error al guardar el movimiento.");
+        return;
+      }
+
+      // 2. Optimistic Update (or updating with the returned DB object)
+      if (data && data.length > 0) {
+        setTransactions((prev) => [data[0] as Transaction, ...prev]);
+      }
+    } catch (err) {
+      console.error("Unexpected error during insert:", err);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen bg-slate-950 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <header className="mb-8 text-center md:text-left flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-100">
+              Gestor de <span className="text-emerald-500">Gastos</span>
+            </h1>
+            <p className="text-slate-400 mt-2">
+              Registra y controla tus finanzas personales de forma rápida y sencilla.
+            </p>
+          </div>
+
+          {/* Selector de Vista (Tabs) */}
+          <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 self-center md:self-auto">
+            <button
+              onClick={() => setCurrentView("operaciones")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentView === "operaciones"
+                  ? "bg-slate-700 text-slate-100 border border-slate-600 shadow-sm"
+                  : "text-slate-400 hover:text-slate-300"
+              }`}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <ListTodo size={16} />
+              Operaciones
+            </button>
+            <button
+              onClick={() => setCurrentView("analisis")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentView === "analisis"
+                  ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                  : "text-slate-400 hover:text-slate-300"
+              }`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              <PieChart size={16} />
+              Análisis Gráfico
+            </button>
+          </div>
+        </header>
+
+        {isLoading ? (
+          <div className="text-center py-20">
+            <p className="text-slate-400 animate-pulse">Cargando base de datos...</p>
+          </div>
+        ) : (
+          <>
+            {/* Panel de Resumen siempre visible */}
+            <section>
+              <SummaryPanel transactions={transactions} />
+            </section>
+
+            {/* Vistas Condicionales */}
+            {currentView === "operaciones" ? (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <section>
+                  <ExpenseForm onAddTransaction={handleAddTransaction} />
+                </section>
+                <section>
+                  <ExpenseList transactions={transactions} />
+                </section>
+              </div>
+            ) : (
+              <section>
+                <AnalyticsView transactions={transactions} />
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </main>
   );
 }
