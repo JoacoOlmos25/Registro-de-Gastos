@@ -27,6 +27,7 @@ CREATE TABLE movimientos (
     fecha DATE NOT NULL,
     descripcion TEXT,
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
     
     -- 3. Restricción estricta: Validar cruce entre tipo e ingreso/gasto
     CONSTRAINT chk_tipo_categoria CHECK (
@@ -38,10 +39,23 @@ CREATE TABLE movimientos (
 -- Habilitar Row Level Security (Seguridad a Nivel de Fila)
 ALTER TABLE movimientos ENABLE ROW LEVEL SECURITY;
 
--- ⚠️ Políticas de Desarrollo (Temporales) ⚠️
--- Como aún no tenemos usuarios registrados, permitimos leer y escribir a todos
-CREATE POLICY "Permitir lectura anónima (Desarrollo)" 
-ON movimientos FOR SELECT USING (true);
+-- ⚠️ Políticas de Producción (Sprint 5) ⚠️
+-- Los usuarios solo pueden leer sus propios registros
+CREATE POLICY "Lectura de datos propios" 
+ON movimientos FOR SELECT 
+USING (auth.uid() = user_id);
 
-CREATE POLICY "Permitir inserción anónima (Desarrollo)" 
-ON movimientos FOR INSERT WITH CHECK (true);
+-- Los usuarios solo pueden insertar registros a su nombre
+CREATE POLICY "Inserción de datos propios" 
+ON movimientos FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+-- Los usuarios solo pueden actualizar/eliminar sus registros
+CREATE POLICY "Modificación de datos propios" 
+ON movimientos FOR UPDATE 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Eliminación de datos propios" 
+ON movimientos FOR DELETE 
+USING (auth.uid() = user_id);
