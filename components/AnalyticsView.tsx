@@ -17,12 +17,13 @@ const MONTHS = [
 ];
 
 export default function AnalyticsView({ transactions }: AnalyticsViewProps) {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("todo");
+  const initialDate = new Date();
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("personalizado");
   const [chartType, setChartType] = useState<TransactionType>("gasto");
   
   // Estados para filtro histórico aislados
-  const [selectedMonth, setSelectedMonth] = useState<number | "todos">("todos");
-  const [selectedYear, setSelectedYear] = useState<number | "todos">("todos");
+  const [selectedMonth, setSelectedMonth] = useState<number | "todos">(initialDate.getMonth());
+  const [selectedYear, setSelectedYear] = useState<number | "todos">(initialDate.getFullYear());
 
   // Extraer dinámicamente los años disponibles
   const availableYears = useMemo(() => {
