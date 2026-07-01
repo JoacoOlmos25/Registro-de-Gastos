@@ -1,14 +1,15 @@
 "use client";
 
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, X } from "lucide-react";
 import { useState } from "react";
 import { Transaction, TransactionType } from "@/types";
 
 interface ExpenseFormProps {
   onAddTransaction: (transaction: Omit<Transaction, "id" | "creado_en">) => void;
+  onClose: () => void;
 }
 
-export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
+export default function ExpenseForm({ onAddTransaction, onClose }: ExpenseFormProps) {
   const [tipo, setTipo] = useState<TransactionType>("gasto");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -24,26 +25,33 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
     };
 
     onAddTransaction(newTransaction);
-    e.currentTarget.reset();
   };
 
   return (
-    <div className="bg-slate-800 p-6 rounded-xl shadow-lg mb-8 border border-slate-700">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-        <h2 className="text-xl font-semibold text-emerald-400 flex items-center gap-2">
+    <div className="bg-card p-6 rounded-xl shadow-2xl border border-border w-full max-w-2xl mx-auto relative animate-in fade-in zoom-in-95 duration-200">
+      {/* Botón Cerrar (X) */}
+      <button 
+        onClick={onClose}
+        className="absolute top-4 right-4 p-1 text-muted hover:text-foreground bg-background hover:bg-border rounded-full transition-colors"
+      >
+        <X size={20} />
+      </button>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 pr-8">
+        <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
           <PlusCircle size={24} />
           Registrar Movimiento
         </h2>
         
         {/* Toggle Ingreso / Gasto */}
-        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+        <div className="flex bg-background rounded-lg p-1 border border-border">
           <button
             type="button"
             onClick={() => setTipo("ingreso")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               tipo === "ingreso" 
-                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30" 
-                : "text-slate-400 hover:text-slate-300"
+                ? "bg-primary/20 text-primary border border-primary/30" 
+                : "text-muted hover:text-foreground"
             }`}
           >
             Ingreso
@@ -53,8 +61,8 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
             onClick={() => setTipo("gasto")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               tipo === "gasto" 
-                ? "bg-slate-700 text-slate-100 border border-slate-600" 
-                : "text-slate-400 hover:text-slate-300"
+                ? "bg-card text-foreground border border-border" 
+                : "text-muted hover:text-foreground"
             }`}
           >
             Gasto
@@ -65,7 +73,7 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label htmlFor="monto" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="monto" className="block text-sm font-medium text-muted">
               Monto
             </label>
             <input
@@ -75,12 +83,12 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
               step="0.01"
               required
               placeholder="0.00"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="categoria" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="categoria" className="block text-sm font-medium text-muted">
               Categoría
             </label>
             <select
@@ -88,7 +96,7 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
               name="categoria"
               required
               defaultValue=""
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors appearance-none"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors appearance-none"
             >
               <option value="" disabled>Selecciona una categoría</option>
               {tipo === "gasto" ? (
@@ -116,7 +124,7 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="fecha" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="fecha" className="block text-sm font-medium text-muted">
               Fecha
             </label>
             <input
@@ -124,12 +132,12 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
               id="fecha"
               name="fecha"
               required
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="descripcion" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="descripcion" className="block text-sm font-medium text-muted">
               Descripción
             </label>
             <input
@@ -138,7 +146,7 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
               name="descripcion"
               required
               placeholder={tipo === "gasto" ? "Ej. Cena con amigos" : "Ej. Pago de quincena"}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             />
           </div>
         </div>
@@ -146,9 +154,9 @@ export default function ExpenseForm({ onAddTransaction }: ExpenseFormProps) {
         <div className="pt-4">
           <button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md shadow-emerald-900/20"
+            className="w-full bg-primary hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md shadow-primary/20"
           >
-            Agregar Movimiento
+            Guardar Movimiento
           </button>
         </div>
       </form>
