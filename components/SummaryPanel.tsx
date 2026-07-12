@@ -53,12 +53,12 @@ export default function SummaryPanel({ transactions }: SummaryPanelProps) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-medium text-muted">Total Ingresos</p>
-            <p className="text-2xl font-bold text-primary mt-1">
+            <p className="text-2xl font-bold text-foreground mt-1">
               ${totalIncome.toFixed(2)}
             </p>
           </div>
           <div className="bg-background p-3 rounded-full border border-border">
-            <TrendingUp className="text-primary" size={24} />
+            <TrendingUp className="text-muted" size={24} />
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export default function SummaryPanel({ transactions }: SummaryPanelProps) {
                 Object.entries(incomeByCategory).map(([cat, amount]) => (
                   <div key={cat} className="flex justify-between items-center text-sm">
                     <span className="text-muted capitalize">{cat}</span>
-                    <span className="text-primary font-medium">${amount.toFixed(2)}</span>
+                    <span className="text-foreground font-medium">${amount.toFixed(2)}</span>
                   </div>
                 ))
               ) : (

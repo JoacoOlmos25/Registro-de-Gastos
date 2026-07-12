@@ -6,7 +6,7 @@ import ExpenseList from "@/components/ExpenseList";
 import SummaryPanel from "@/components/SummaryPanel";
 import AnalyticsView from "@/components/AnalyticsView";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { Transaction } from "@/types";
+import { Transaction, Categoria } from "@/types";
 import { ListTodo, PieChart, LogOut, Loader2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ type ViewMode = "operaciones" | "analisis";
 
 export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [currentView, setCurrentView] = useState<ViewMode>("operaciones");
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -34,15 +35,29 @@ export default function Home() {
           setUserId(user.id);
         }
 
+        const { data: categoriasData, error: catError } = await supabase
+          .from("categorias")
+          .select("*")
+          .order("nombre", { ascending: true });
+
+        if (!catError && categoriasData) {
+          setCategorias(categoriasData);
+        }
+
         const { data, error } = await supabase
           .from("movimientos")
-          .select("*")
+          .select("*, categorias(nombre)")
           .order("fecha", { ascending: false });
 
         if (error) {
           setTransactions([]);
         } else {
-          setTransactions(data || []);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const mappedData = data?.map((t: any) => ({
+            ...t,
+            categoria: t.categorias?.nombre || "Desconocida"
+          })) || [];
+          setTransactions(mappedData);
         }
       } catch {
         setTransactions([]);
@@ -54,7 +69,7 @@ export default function Home() {
     fetchTransactions();
   }, [supabase]);
 
-  const handleAddTransaction = async (newTransaction: Omit<Transaction, "id" | "creado_en">) => {
+  const handleAddTransaction = async (newTransaction: Partial<Transaction> & { categoria_id: string, monto: number, fecha: string, descripcion: string, tipo: "ingreso" | "gasto" }) => {
     if (!userId) return;
 
     try {
@@ -71,7 +86,12 @@ export default function Home() {
 
       // 2. Optimistic Update
       if (data && data.length > 0) {
-        setTransactions((prev) => [data[0] as Transaction, ...prev]);
+        const catNombre = categorias.find(c => c.id === newTransaction.categoria_id)?.nombre || "Desconocida";
+        const optimista = {
+          ...(data[0] as Transaction),
+          categoria: catNombre,
+        };
+        setTransactions((prev) => [optimista, ...prev]);
         // Cierra el modal automáticamente al éxito
         setIsModalOpen(false);
       }
@@ -187,6 +207,9 @@ export default function Home() {
           {/* Formulario envuelto */}
           <div className="relative z-10 w-full max-w-2xl">
             <ExpenseForm 
+              categorias={categorias}
+              userId={userId}
+              onCategoryAdded={(cat) => setCategorias((prev) => [...prev, cat])}
               onAddTransaction={handleAddTransaction} 
               onClose={() => setIsModalOpen(false)} 
             />
