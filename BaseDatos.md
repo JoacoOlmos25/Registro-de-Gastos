@@ -59,3 +59,89 @@ WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Eliminación de datos propios" 
 ON movimientos FOR DELETE 
 USING (auth.uid() = user_id);
+
+---
+
+## Migración Sprint 10: Categorías Relacionales
+
+Ejecutar este script en el SQL Editor de Supabase para aplicar los cambios del Sprint 10:
+
+```sql
+-- 1. Crear la tabla de categorías
+CREATE TABLE categorias (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    tipo VARCHAR(10) CHECK (tipo IN ('ingreso', 'gasto')) NOT NULL,
+    user_id UUID REFERENCES auth.users(id), -- NULL para globales
+    es_predeterminada BOOLEAN NOT NULL DEFAULT false,
+    creado_en TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(user_id, nombre, tipo)
+);
+
+-- 2. Habilitar RLS en categorías
+ALTER TABLE categorias ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lectura de categorias (propias y globales)" 
+ON categorias FOR SELECT 
+USING (user_id = auth.uid() OR user_id IS NULL);
+
+CREATE POLICY "Inserción de categorias propias" 
+ON categorias FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Modificación de categorias propias" 
+ON categorias FOR UPDATE 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Eliminación de categorias propias" 
+ON categorias FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- 3. Poblar categorías predeterminadas
+INSERT INTO categorias (nombre, tipo, user_id, es_predeterminada) VALUES
+('Alimentación', 'gasto', NULL, true),
+('Transporte', 'gasto', NULL, true),
+('Servicios', 'gasto', NULL, true),
+('Entretenimiento', 'gasto', NULL, true),
+('Salud', 'gasto', NULL, true),
+('Educación', 'gasto', NULL, true),
+('Compras', 'gasto', NULL, true),
+('Otros', 'gasto', NULL, true),
+('Salario', 'ingreso', NULL, true),
+('Inversiones', 'ingreso', NULL, true),
+('Freelance', 'ingreso', NULL, true),
+('Ventas', 'ingreso', NULL, true),
+('Regalos/Bonos', 'ingreso', NULL, true),
+('Otros', 'ingreso', NULL, true);
+
+-- 4. Truncar la tabla movimientos para limpiar datos de prueba viejos
+TRUNCATE TABLE movimientos;
+
+-- 5. Modificar la tabla movimientos (eliminar enum, agregar fk)
+ALTER TABLE movimientos DROP CONSTRAINT chk_tipo_categoria;
+ALTER TABLE movimientos DROP COLUMN categoria;
+ALTER TABLE movimientos ADD COLUMN categoria_id UUID REFERENCES categorias(id) NOT NULL;
+
+-- 6. Eliminar el tipo ENUM antiguo
+DROP TYPE categoria_tipo;
+
+-- 7. Crear el trigger para validar integridad de tipo
+CREATE OR REPLACE FUNCTION validar_tipo_movimiento_categoria()
+RETURNS TRIGGER AS $$
+DECLARE
+    cat_tipo VARCHAR;
+BEGIN
+    SELECT tipo INTO cat_tipo FROM categorias WHERE id = NEW.categoria_id;
+    IF NEW.tipo != cat_tipo THEN
+        RAISE EXCEPTION 'El tipo de movimiento (%) no coincide con el tipo de la categoría (%)', NEW.tipo, cat_tipo;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_tipo_categoria
+BEFORE INSERT OR UPDATE ON movimientos
+FOR EACH ROW
+EXECUTE FUNCTION validar_tipo_movimiento_categoria();
+```
