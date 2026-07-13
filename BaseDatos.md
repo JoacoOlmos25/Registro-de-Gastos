@@ -145,3 +145,46 @@ BEFORE INSERT OR UPDATE ON movimientos
 FOR EACH ROW
 EXECUTE FUNCTION validar_tipo_movimiento_categoria();
 ```
+
+---
+
+## Migración Sprint 12: Gastos Fijos y Semaforización
+
+Ejecutar este script en el SQL Editor de Supabase para aplicar los cambios de la Fase A del Sprint 12:
+
+```sql
+-- 1. Crear la tabla de gastos fijos
+CREATE TABLE gastos_fijos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    monto_estimado DECIMAL(12,2) NOT NULL,
+    categoria_id UUID REFERENCES categorias(id) NOT NULL,
+    dia_vencimiento INTEGER NOT NULL CHECK (dia_vencimiento BETWEEN 1 AND 31),
+    activo BOOLEAN NOT NULL DEFAULT true,
+    creado_en TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Habilitar RLS en gastos fijos
+ALTER TABLE gastos_fijos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lectura de gastos fijos propios" 
+ON gastos_fijos FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Inserción de gastos fijos propios" 
+ON gastos_fijos FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Modificación de gastos fijos propios" 
+ON gastos_fijos FOR UPDATE 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Eliminación de gastos fijos propios" 
+ON gastos_fijos FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- 3. Modificar la tabla movimientos (vincular con gastos fijos)
+ALTER TABLE movimientos ADD COLUMN gasto_fijo_id UUID REFERENCES gastos_fijos(id);
+```
