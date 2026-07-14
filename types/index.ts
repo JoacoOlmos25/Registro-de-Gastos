@@ -6,6 +6,7 @@ export interface Categoria {
   tipo: TransactionType;
   user_id: string | null;
   es_predeterminada: boolean;
+  activa: boolean;
   creado_en?: string;
 }
 
@@ -30,5 +31,15 @@ export interface GastoFijo {
   categoria_nombre?: string; // Auxiliar
   dia_vencimiento: number;
   activo: boolean;
+  creado_en?: string;
+}
+export interface Presupuesto {
+  id: string;
+  user_id: string;
+  categoria_id: string;
+  categoria_nombre?: string; // Auxiliar
+  monto_limite: number;
+  mes: number;
+  anio: number;
   creado_en?: string;
 }
