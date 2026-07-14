@@ -6,7 +6,7 @@ import DeleteConfirmModal from "./DeleteConfirmModal";
 interface SettingsModalProps {
   categorias: Categoria[];
   onClose: () => void;
-  onDeleteCategory: (id: string) => void;
+  onDeleteCategory: (id: string) => Promise<void>;
   userId: string | null;
 }
 
@@ -76,8 +76,8 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
           transactionId={categoryToDelete.id}
           transactionDesc={`Categoría: ${categoryToDelete.name}`}
           onClose={() => setCategoryToDelete(null)}
-          onConfirm={(id) => {
-            onDeleteCategory(id);
+          onConfirm={async (id) => {
+            await onDeleteCategory(id);
             setCategoryToDelete(null);
           }}
         />
