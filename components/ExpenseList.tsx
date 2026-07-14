@@ -1,11 +1,12 @@
-import { ReceiptText, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ReceiptText, ArrowUpRight, ArrowDownRight, Trash2 } from "lucide-react";
 import { Transaction } from "@/types";
 
 interface ExpenseListProps {
   transactions: Transaction[];
+  onDeleteRequest?: (id: string, desc: string) => void;
 }
 
-export default function ExpenseList({ transactions }: ExpenseListProps) {
+export default function ExpenseList({ transactions, onDeleteRequest }: ExpenseListProps) {
   if (transactions.length === 0) {
     return (
       <div className="bg-card p-6 rounded-xl shadow-lg border border-border text-center">
@@ -48,8 +49,19 @@ export default function ExpenseList({ transactions }: ExpenseListProps) {
                 </span>
               </div>
               
-              <div className={`text-lg font-bold ${isIncome ? "text-primary" : "text-foreground"}`}>
-                {isIncome ? "+" : "-"}${Number(transaction.monto).toFixed(2)}
+              <div className="flex items-center gap-4">
+                <div className={`text-lg font-bold ${isIncome ? "text-primary" : "text-foreground"}`}>
+                  {isIncome ? "+" : "-"}${Number(transaction.monto).toFixed(2)}
+                </div>
+                {onDeleteRequest && (
+                  <button
+                    onClick={() => onDeleteRequest(transaction.id, transaction.descripcion || "Movimiento sin descripción")}
+                    className="p-2 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    title="Borrar movimiento"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
               </div>
             </div>
           );
