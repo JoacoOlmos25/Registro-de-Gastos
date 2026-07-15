@@ -78,7 +78,7 @@ export default function DeleteConfirmModal({
       // Proceder al borrado si el PIN es correcto o se acaba de crear
       await onConfirm(transactionId);
       // El modal se cerrará desde afuera (en page o list) al completar onConfirm
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setError("Ocurrió un error. Inténtalo de nuevo.");
       setIsSubmitting(false);
