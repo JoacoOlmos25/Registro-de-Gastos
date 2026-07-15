@@ -15,10 +15,16 @@ import TransactionFilters from "@/components/TransactionFilters";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import FixedExpensesList from "@/components/FixedExpensesList";
 import AddFixedExpenseForm from "@/components/AddFixedExpenseForm";
+import InactiveFixedExpenses from "@/components/InactiveFixedExpenses";
 import SettingsModal from "@/components/SettingsModal";
 import BudgetPanel from "@/components/BudgetPanel";
 import BudgetFormModal from "@/components/BudgetFormModal";
+import BudgetAlertBanner from "@/components/BudgetAlertBanner";
+import AhorrosPanel from "@/components/AhorrosPanel";
+import AhorroFormModal from "@/components/AhorroFormModal";
+import MovimientoAhorroModal from "@/components/MovimientoAhorroModal";
 import { exportTransactionsToCSV } from "@/utils/csvExport";
+import { Ahorro, MovimientoAhorro } from "@/types";
 
 type ViewMode = "operaciones" | "analisis" | "gastos_fijos" | "presupuestos";
 
@@ -42,11 +48,23 @@ export default function Home() {
   const [paidGastoFijoIds, setPaidGastoFijoIds] = useState<string[]>([]);
   const [isFixedExpenseModalOpen, setIsFixedExpenseModalOpen] = useState(false);
   const [isAddingFixedExpense, setIsAddingFixedExpense] = useState(false);
+  const [editingFixedExpense, setEditingFixedExpense] = useState<GastoFijo | null>(null);
+  const [fixedExpensesTab, setFixedExpensesTab] = useState<"activos" | "cancelados">("activos");
+  const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<{id: string, desc: string} | null>(null);
 
   // Estados para Presupuestos
   const [budgets, setBudgets] = useState<Presupuesto[]>([]);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Presupuesto | null>(null);
+  const [presupuestosTab, setPresupuestosTab] = useState<"presupuestos" | "ahorros">("presupuestos");
+
+  // Estados para Ahorros
+  const [ahorros, setAhorros] = useState<Ahorro[]>([]);
+  const [isAhorroModalOpen, setIsAhorroModalOpen] = useState(false);
+  const [editingAhorro, setEditingAhorro] = useState<Ahorro | null>(null);
+  const [isMovimientoAhorroModalOpen, setIsMovimientoAhorroModalOpen] = useState(false);
+  const [movimientoAhorroAhorro, setMovimientoAhorroAhorro] = useState<Ahorro | null>(null);
+  const [movimientoAhorroTipo, setMovimientoAhorroTipo] = useState<"aporte" | "retiro" | null>(null);
 
   // Estado para el Modal de Ajustes
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -54,6 +72,7 @@ export default function Home() {
   // Estado para el Modal de Operaciones
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<{id: string, desc: string} | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
   const supabase = createClient();
   const router = useRouter();
@@ -174,8 +193,8 @@ export default function Home() {
 
         const paidIds = pagadosData?.map(p => p.gasto_fijo_id as string) || [];
         setPaidGastoFijoIds(paidIds);
-      } catch (err) {
-        console.error("Error fetching gastos fijos:", err);
+      } catch (_err) {
+        console.error("Error fetching gastos fijos:", _err);
       }
     };
 
@@ -184,8 +203,6 @@ export default function Home() {
 
   // Fetch Presupuestos
   useEffect(() => {
-    if (currentView !== "presupuestos") return;
-
     const fetchBudgets = async () => {
       try {
         const today = new Date();
@@ -206,13 +223,34 @@ export default function Home() {
           categoria_nombre: b.categorias?.nombre || "Desconocida"
         })) || [];
         setBudgets(mappedBudgets);
-      } catch (err) {
-        console.error("Error fetching presupuestos:", err);
+      } catch (_err) {
+        console.error("Error fetching presupuestos:", _err);
       }
     };
 
     fetchBudgets();
   }, [supabase, currentView, selectedMonth, selectedYear]);
+
+  // Fetch Ahorros
+  useEffect(() => {
+    if (currentView !== "presupuestos" || presupuestosTab !== "ahorros") return;
+
+    const fetchAhorros = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("ahorros")
+          .select("*")
+          .order("creado_en", { ascending: false });
+
+        if (error) throw error;
+        setAhorros(data || []);
+      } catch (_err) {
+        console.error("Error fetching ahorros:", _err);
+      }
+    };
+
+    fetchAhorros();
+  }, [supabase, currentView, presupuestosTab]);
 
   const handleAddTransaction = async (newTransaction: Partial<Transaction> & { categoria_id: string, monto: number, fecha: string, descripcion: string, tipo: "ingreso" | "gasto" }) => {
     if (!userId) return;
@@ -233,12 +271,42 @@ export default function Home() {
         const optimista = {
           ...(data[0] as Transaction),
           categoria: catNombre,
+          categorias: { nombre: catNombre }
         };
         setTransactions((prev) => [optimista, ...prev]);
         setIsModalOpen(false);
       }
     } catch {
       alert("Hubo un error al guardar el movimiento.");
+    }
+  };
+
+  const handleEditTransaction = async (id: string, updatedTransaction: Partial<Transaction>) => {
+    try {
+      const { data, error } = await supabase
+        .from("movimientos")
+        .update(updatedTransaction)
+        .eq("id", id)
+        .select();
+
+      if (error) {
+        alert("Hubo un error al actualizar el movimiento.");
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const catNombre = categorias.find(c => c.id === updatedTransaction.categoria_id)?.nombre || "Desconocida";
+        const optimista = {
+          ...(data[0] as Transaction),
+          categoria: catNombre,
+          categorias: { nombre: catNombre }
+        };
+        setTransactions((prev) => prev.map(t => t.id === id ? optimista : t));
+        setIsModalOpen(false);
+        setEditingTransaction(null);
+      }
+    } catch {
+      alert("Hubo un error al actualizar el movimiento.");
     }
   };
 
@@ -249,8 +317,8 @@ export default function Home() {
       
       setTransactions((prev) => prev.filter((t) => t.id !== id));
       setTransactionToDelete(null);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
       alert("Hubo un error al borrar el movimiento.");
     }
   };
@@ -275,21 +343,99 @@ export default function Home() {
         setGastosFijos((prev) => [...prev, mappedData].sort((a, b) => a.dia_vencimiento - b.dia_vencimiento));
         setIsFixedExpenseModalOpen(false);
       }
-    } catch (err) {
+    } catch (_err) {
       alert("Error al agregar gasto fijo.");
     } finally {
       setIsAddingFixedExpense(false);
     }
   };
 
-  const handleDeleteFixedExpense = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este gasto fijo? Los pagos ya realizados no se borrarán.")) return;
+  const handleEditFixedExpense = async (id: string, updatedExpense: Partial<GastoFijo>) => {
+    setIsAddingFixedExpense(true);
+    try {
+      const { data, error } = await supabase
+        .from("gastos_fijos")
+        .update(updatedExpense)
+        .eq("id", id)
+        .select("*, categorias(nombre)");
+
+      if (error) {
+        alert("Hubo un error al actualizar el gasto fijo.");
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const mappedData = {
+          ...(data[0] as GastoFijo),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          categoria_nombre: (data[0] as any).categorias?.nombre || "Desconocida"
+        };
+        setGastosFijos((prev) => prev.map(g => g.id === id ? mappedData : g).sort((a, b) => a.dia_vencimiento - b.dia_vencimiento));
+        setIsFixedExpenseModalOpen(false);
+        setEditingFixedExpense(null);
+      }
+    } catch {
+      alert("Hubo un error al actualizar el gasto fijo.");
+    } finally {
+      setIsAddingFixedExpense(false);
+    }
+  };
+
+  const handleConfirmDeleteFixedExpense = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("gastos_fijos")
+        .update({ activo: false })
+        .eq("id", id)
+        .select("*, categorias(nombre)");
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const mappedData = {
+          ...(data[0] as GastoFijo),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          categoria_nombre: (data[0] as any).categorias?.nombre || "Desconocida"
+        };
+        setGastosFijos((prev) => prev.map(g => g.id === id ? mappedData : g));
+      }
+      setFixedExpenseToDelete(null);
+    } catch (_err) {
+      alert("Error al eliminar gasto fijo.");
+    }
+  };
+
+  const handleReactivateFixedExpense = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("gastos_fijos")
+        .update({ activo: true })
+        .eq("id", id)
+        .select("*, categorias(nombre)");
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const mappedData = {
+          ...(data[0] as GastoFijo),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          categoria_nombre: (data[0] as any).categorias?.nombre || "Desconocida"
+        };
+        setGastosFijos((prev) => prev.map(g => g.id === id ? mappedData : g));
+      }
+    } catch {
+      alert("Error al reactivar el servicio.");
+    }
+  };
+
+  const handleDeleteFixedExpensePermanent = async (id: string) => {
+    if (!confirm("¿Eliminar este registro permanentemente? No se puede deshacer.")) return;
     try {
       const { error } = await supabase.from("gastos_fijos").delete().eq("id", id);
       if (error) throw error;
       setGastosFijos((prev) => prev.filter(g => g.id !== id));
-    } catch (err) {
-      alert("Error al eliminar gasto fijo.");
+    } catch (_err) {
+      alert("Error al eliminar permanentemente.");
     }
   };
 
@@ -300,9 +446,9 @@ export default function Home() {
       
       // Actualizamos estado local
       setCategorias(prev => prev.map(c => c.id === id ? { ...c, activa: false } : c));
-    } catch (err) {
-      console.error(err);
-      alert("Error al eliminar la categoría.");
+    } catch (_err) {
+      console.error(_err);
+      alert("No se pudo desactivar la categoría.");
     }
   };
 
@@ -345,7 +491,7 @@ export default function Home() {
       
       // Mostrar feedback
       alert(`¡${gasto.nombre} marcado como pagado exitosamente!`);
-    } catch (err) {
+    } catch (_err) {
       alert("Error al registrar el pago.");
     }
   };
@@ -395,7 +541,7 @@ export default function Home() {
       }
       setIsBudgetModalOpen(false);
       setEditingBudget(null);
-    } catch (err) {
+    } catch (_err) {
       alert("Error al guardar presupuesto.");
     }
   };
@@ -405,8 +551,79 @@ export default function Home() {
       const { error } = await supabase.from("presupuestos").delete().eq("id", id);
       if (error) throw error;
       setBudgets(prev => prev.filter(b => b.id !== id));
-    } catch (err) {
+    } catch (_err) {
       alert("Error al eliminar presupuesto.");
+    }
+  };
+
+  const handleSaveAhorro = async (ahorroInput: Partial<Ahorro>) => {
+    if (!userId) return;
+
+    try {
+      if (editingAhorro) {
+        const { data, error } = await supabase
+          .from("ahorros")
+          .update(ahorroInput)
+          .eq("id", editingAhorro.id)
+          .select();
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setAhorros(prev => prev.map(a => a.id === editingAhorro.id ? data[0] as Ahorro : a));
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("ahorros")
+          .insert([{ ...ahorroInput, user_id: userId }])
+          .select();
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setAhorros(prev => [data[0] as Ahorro, ...prev]);
+        }
+      }
+      setIsAhorroModalOpen(false);
+      setEditingAhorro(null);
+    } catch (_err) {
+      alert("Error al guardar la meta de ahorro.");
+    }
+  };
+
+  const handleDeleteAhorro = async (id: string) => {
+    try {
+      const { error } = await supabase.from("ahorros").delete().eq("id", id);
+      if (error) throw error;
+      setAhorros(prev => prev.filter(a => a.id !== id));
+    } catch (_err) {
+      alert("Error al eliminar la meta de ahorro.");
+    }
+  };
+
+  const handleSaveMovimientoAhorro = async (movimientoInput: Partial<MovimientoAhorro>) => {
+    if (!userId || !movimientoAhorroAhorro) return;
+
+    try {
+      const { error } = await supabase
+        .from("movimientos_ahorro")
+        .insert([{ ...movimientoInput, user_id: userId }]);
+      if (error) throw error;
+      
+      // Since the DB trigger updates 'monto_actual' in 'ahorros', we need to re-fetch the updated 'ahorro' to reflect the change in the UI.
+      const { data: updatedAhorro, error: fetchError } = await supabase
+        .from("ahorros")
+        .select("*")
+        .eq("id", movimientoAhorroAhorro.id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      if (updatedAhorro) {
+        setAhorros(prev => prev.map(a => a.id === updatedAhorro.id ? updatedAhorro as Ahorro : a));
+      }
+      
+      setIsMovimientoAhorroModalOpen(false);
+      setMovimientoAhorroAhorro(null);
+      setMovimientoAhorroTipo(null);
+    } catch (_err) {
+      alert("Error al guardar el movimiento de ahorro.");
     }
   };
 
@@ -414,6 +631,15 @@ export default function Home() {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  // Pre-calcular estado de presupuestos para compartirlos globalmente
+  const budgetStatuses = budgets.map((budget) => {
+    const consumed = transactions
+      .filter((t) => t.tipo === "gasto" && t.categoria_id === budget.categoria_id)
+      .reduce((acc, t) => acc + Number(t.monto), 0);
+    const percentage = budget.monto_limite > 0 ? (consumed / budget.monto_limite) * 100 : 0;
+    return { ...budget, consumed, percentage };
+  });
 
   return (
     <main className="min-h-screen bg-background p-4 md:p-8 relative transition-colors duration-300">
@@ -499,6 +725,14 @@ export default function Home() {
           </div>
         </header>
 
+        <div className="mb-6">
+          <BudgetAlertBanner 
+            budgetStatuses={budgetStatuses} 
+            onViewDetails={() => setCurrentView("presupuestos")} 
+          />
+        </div>
+
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-4 animate-in fade-in duration-500">
             <Loader2 className="animate-spin text-primary" size={48} />
@@ -516,7 +750,10 @@ export default function Home() {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
                 <div className="flex justify-start mb-4 gap-4">
                   <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => {
+                      setEditingTransaction(null);
+                      setIsModalOpen(true);
+                    }}
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-primary/20"
                   >
                     <Plus size={18} />
@@ -548,6 +785,10 @@ export default function Home() {
                   />
                   <ExpenseList 
                     transactions={transactions} 
+                    onEditRequest={(t) => {
+                      setEditingTransaction(t);
+                      setIsModalOpen(true);
+                    }}
                     onDeleteRequest={(id, desc) => setTransactionToDelete({id, desc})}
                   />
                 </section>
@@ -560,7 +801,10 @@ export default function Home() {
                     <p className="text-sm text-muted mt-1">Lleva el control de tus pagos recurrentes mes a mes.</p>
                   </div>
                   <button
-                    onClick={() => setIsFixedExpenseModalOpen(true)}
+                    onClick={() => {
+                      setEditingFixedExpense(null);
+                      setIsFixedExpenseModalOpen(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-rose-600/20 whitespace-nowrap"
                   >
                     <Plus size={18} />
@@ -568,46 +812,151 @@ export default function Home() {
                   </button>
                 </div>
 
-                <FixedExpensesList 
-                  gastosFijos={gastosFijos}
-                  paidGastoFijoIds={paidGastoFijoIds}
-                  onPay={handlePayFixedExpense}
-                  onDelete={handleDeleteFixedExpense}
-                />
+                <div className="bg-card border border-border rounded-xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-in zoom-in-95 duration-300">
+                  <div>
+                    <p className="text-sm text-muted font-medium mb-1">Compromiso Mensual Fijo</p>
+                    <p className="text-3xl font-bold text-foreground">
+                      ${gastosFijos.filter(g => g.activo).reduce((acc, g) => acc + g.monto_estimado, 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-4 py-2 rounded-lg text-sm font-semibold">
+                    {gastosFijos.filter(g => g.activo).length} Servicios Activos
+                  </div>
+                </div>
+
+                <div className="flex gap-4 border-b border-border mb-6">
+                  <button
+                    onClick={() => setFixedExpensesTab("activos")}
+                    className={`pb-2 font-medium transition-colors border-b-2 ${
+                      fixedExpensesTab === "activos"
+                        ? "text-primary border-primary"
+                        : "text-muted hover:text-foreground border-transparent"
+                    }`}
+                  >
+                    Activos ({gastosFijos.filter(g => g.activo).length})
+                  </button>
+                  <button
+                    onClick={() => setFixedExpensesTab("cancelados")}
+                    className={`pb-2 font-medium transition-colors border-b-2 ${
+                      fixedExpensesTab === "cancelados"
+                        ? "text-rose-500 border-rose-500"
+                        : "text-muted hover:text-foreground border-transparent"
+                    }`}
+                  >
+                    Cancelados ({gastosFijos.filter(g => !g.activo).length})
+                  </button>
+                </div>
+
+                {fixedExpensesTab === "activos" ? (
+                  <FixedExpensesList 
+                    gastosFijos={gastosFijos.filter(g => g.activo)}
+                    paidGastoFijoIds={paidGastoFijoIds}
+                    onPay={handlePayFixedExpense}
+                    onDelete={(id) => setFixedExpenseToDelete({id, desc: gastosFijos.find(g => g.id === id)?.nombre || "Gasto Fijo"})}
+                    onEdit={(gasto) => {
+                      setEditingFixedExpense(gasto);
+                      setIsFixedExpenseModalOpen(true);
+                    }}
+                  />
+                ) : (
+                  <InactiveFixedExpenses
+                    gastosInactivos={gastosFijos.filter(g => !g.activo)}
+                    onReactivate={handleReactivateFixedExpense}
+                    onDeletePermanent={handleDeleteFixedExpensePermanent}
+                  />
+                )}
               </div>
             ) : currentView === "presupuestos" ? (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
                 <div className="flex justify-between items-center mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-foreground">Presupuestos por Categoría</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Metas y Presupuestos</h2>
                     <p className="text-sm text-muted mt-1">
-                      {selectedMonth !== null && selectedYear !== null 
-                        ? `Límites de gasto para el mes ${selectedMonth}/${selectedYear}` 
-                        : "Límites de gasto para el mes actual"}
+                      {presupuestosTab === "presupuestos" 
+                        ? (selectedMonth !== null && selectedYear !== null 
+                            ? `Límites de gasto para el mes ${selectedMonth}/${selectedYear}` 
+                            : "Límites de gasto para el mes actual")
+                        : "Gestiona tus frascos de ahorro independientes."}
                     </p>
                   </div>
+                  {presupuestosTab === "presupuestos" ? (
+                    <button
+                      onClick={() => {
+                        setEditingBudget(null);
+                        setIsBudgetModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-600/20 whitespace-nowrap"
+                    >
+                      <Plus size={18} />
+                      <span className="hidden sm:inline">Nuevo Presupuesto</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingAhorro(null);
+                        setIsAhorroModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-primary/20 whitespace-nowrap"
+                    >
+                      <Plus size={18} />
+                      <span className="hidden sm:inline">Nueva Meta</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex gap-4 border-b border-border mb-6">
                   <button
-                    onClick={() => {
-                      setEditingBudget(null);
-                      setIsBudgetModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-600/20 whitespace-nowrap"
+                    onClick={() => setPresupuestosTab("presupuestos")}
+                    className={`pb-2 font-medium transition-colors border-b-2 ${
+                      presupuestosTab === "presupuestos"
+                        ? "text-emerald-500 border-emerald-500"
+                        : "text-muted hover:text-foreground border-transparent"
+                    }`}
                   >
-                    <Plus size={18} />
-                    <span className="hidden sm:inline">Nuevo Presupuesto</span>
+                    Mis Presupuestos
+                  </button>
+                  <button
+                    onClick={() => setPresupuestosTab("ahorros")}
+                    className={`pb-2 font-medium transition-colors border-b-2 ${
+                      presupuestosTab === "ahorros"
+                        ? "text-primary border-primary"
+                        : "text-muted hover:text-foreground border-transparent"
+                    }`}
+                  >
+                    Mis Ahorros
                   </button>
                 </div>
                 
-                <BudgetPanel 
-                  budgets={budgets} 
-                  transactions={transactions} 
-                  categorias={categorias}
-                  onEdit={(b) => {
-                    setEditingBudget(b);
-                    setIsBudgetModalOpen(true);
-                  }}
-                  onDelete={handleDeleteBudget}
-                />
+                {presupuestosTab === "presupuestos" ? (
+                  <BudgetPanel 
+                    budgets={budgetStatuses} 
+                    transactions={transactions} 
+                    onEdit={(b) => {
+                      setEditingBudget(b);
+                      setIsBudgetModalOpen(true);
+                    }}
+                    onDelete={handleDeleteBudget}
+                  />
+                ) : (
+                  <AhorrosPanel 
+                    ahorros={ahorros}
+                    onEdit={(a) => {
+                      setEditingAhorro(a);
+                      setIsAhorroModalOpen(true);
+                    }}
+                    onDelete={handleDeleteAhorro}
+                    onAporte={(a) => {
+                      setMovimientoAhorroAhorro(a);
+                      setMovimientoAhorroTipo("aporte");
+                      setIsMovimientoAhorroModalOpen(true);
+                    }}
+                    onRetiro={(a) => {
+                      setMovimientoAhorroAhorro(a);
+                      setMovimientoAhorroTipo("retiro");
+                      setIsMovimientoAhorroModalOpen(true);
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <section>
@@ -620,6 +969,29 @@ export default function Home() {
 
       {/* Contenedores de Modal */}
       
+      {/* Modales de Ahorros */}
+      <AhorroFormModal 
+        isOpen={isAhorroModalOpen}
+        onClose={() => {
+          setIsAhorroModalOpen(false);
+          setEditingAhorro(null);
+        }}
+        onSave={handleSaveAhorro}
+        initialData={editingAhorro}
+      />
+      
+      <MovimientoAhorroModal
+        isOpen={isMovimientoAhorroModalOpen}
+        onClose={() => {
+          setIsMovimientoAhorroModalOpen(false);
+          setMovimientoAhorroAhorro(null);
+          setMovimientoAhorroTipo(null);
+        }}
+        onSave={handleSaveMovimientoAhorro}
+        ahorro={movimientoAhorroAhorro}
+        tipoForm={movimientoAhorroTipo}
+      />
+
       {/* Modal Nueva Operación */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -632,8 +1004,13 @@ export default function Home() {
               categorias={categorias.filter(c => c.activa)}
               userId={userId}
               onCategoryAdded={(cat) => setCategorias((prev) => [...prev, cat])}
-              onAddTransaction={handleAddTransaction} 
-              onClose={() => setIsModalOpen(false)} 
+              onAddTransaction={handleAddTransaction}
+              onEditTransaction={handleEditTransaction}
+              initialData={editingTransaction}
+              onClose={() => {
+                setIsModalOpen(false);
+                setEditingTransaction(null);
+              }} 
             />
           </div>
         </div>
@@ -650,8 +1027,15 @@ export default function Home() {
             <AddFixedExpenseForm 
               categorias={categorias.filter(c => c.activa)}
               onAdd={handleAddFixedExpense}
-              onCancel={() => setIsFixedExpenseModalOpen(false)}
+              onEdit={handleEditFixedExpense}
+              initialData={editingFixedExpense}
+              onCancel={() => {
+                setIsFixedExpenseModalOpen(false);
+                setEditingFixedExpense(null);
+              }}
               isSubmitting={isAddingFixedExpense}
+              userId={userId}
+              onCategoryAdded={(cat) => setCategorias((prev) => [...prev, cat])}
             />
           </div>
         </div>
@@ -664,6 +1048,16 @@ export default function Home() {
           transactionDesc={transactionToDelete.desc}
           onClose={() => setTransactionToDelete(null)}
           onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Modal Borrar Gasto Fijo */}
+      {fixedExpenseToDelete && (
+        <DeleteConfirmModal
+          transactionId={fixedExpenseToDelete.id}
+          transactionDesc={fixedExpenseToDelete.desc}
+          onClose={() => setFixedExpenseToDelete(null)}
+          onConfirm={handleConfirmDeleteFixedExpense}
         />
       )}
 
@@ -687,6 +1081,8 @@ export default function Home() {
                 setIsBudgetModalOpen(false);
                 setEditingBudget(null);
               }}
+              userId={userId}
+              onCategoryAdded={(cat) => setCategorias((prev) => [...prev, cat])}
             />
           </div>
         </div>
@@ -699,6 +1095,9 @@ export default function Home() {
           userId={userId}
           onClose={() => setIsSettingsModalOpen(false)}
           onDeleteCategory={handleDeleteCategory}
+          gastosInactivos={gastosFijos.filter(g => !g.activo)}
+          onReactivateFixedExpense={handleReactivateFixedExpense}
+          onDeleteFixedExpensePermanent={handleDeleteFixedExpensePermanent}
         />
       )}
     </main>

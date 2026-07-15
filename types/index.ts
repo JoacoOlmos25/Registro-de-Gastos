@@ -43,3 +43,27 @@ export interface Presupuesto {
   anio: number;
   creado_en?: string;
 }
+
+export interface BudgetStatus extends Presupuesto {
+  consumed: number;
+  percentage: number;
+}
+
+export interface Ahorro {
+  id: string;
+  user_id: string;
+  nombre: string;
+  monto_objetivo: number | null;
+  monto_actual: number;
+  creado_en?: string;
+}
+
+export interface MovimientoAhorro {
+  id: string;
+  ahorro_id: string;
+  user_id: string;
+  monto: number;
+  tipo: "aporte" | "retiro";
+  fecha: string; // YYYY-MM-DD
+  creado_en?: string;
+}
