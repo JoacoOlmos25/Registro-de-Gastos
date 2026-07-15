@@ -23,8 +23,11 @@ export default function BudgetFormModal({
 
   useEffect(() => {
     if (editingBudget) {
-      setCategoriaId(editingBudget.categoria_id);
-      setMontoLimite(editingBudget.monto_limite.toString());
+      const updateState = () => {
+        setCategoriaId(editingBudget.categoria_id);
+        setMontoLimite(editingBudget.monto_limite.toString());
+      };
+      updateState();
     }
   }, [editingBudget]);
 

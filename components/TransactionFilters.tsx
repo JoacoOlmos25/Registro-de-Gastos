@@ -99,7 +99,7 @@ export default function TransactionFilters({
           <Filter className="text-muted mr-2" size={16} />
           <select
             value={selectedTipo || ""}
-            onChange={(e) => onTipoChange((e.target.value as any) || null)}
+            onChange={(e) => onTipoChange((e.target.value as "ingreso" | "gasto") || null)}
             className="bg-transparent text-foreground py-1 outline-none appearance-none pr-4 text-sm"
           >
             <option value="">Tipo (Todos)</option>

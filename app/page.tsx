@@ -7,7 +7,7 @@ import SummaryPanel from "@/components/SummaryPanel";
 import AnalyticsView from "@/components/AnalyticsView";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Transaction, Categoria, GastoFijo, Presupuesto } from "@/types";
-import { ListTodo, PieChart, LogOut, Loader2, Plus, Calendar, Settings, TrendingUp } from "lucide-react";
+import { ListTodo, PieChart, LogOut, Loader2, Plus, Calendar, Settings, TrendingUp, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -18,6 +18,7 @@ import AddFixedExpenseForm from "@/components/AddFixedExpenseForm";
 import SettingsModal from "@/components/SettingsModal";
 import BudgetPanel from "@/components/BudgetPanel";
 import BudgetFormModal from "@/components/BudgetFormModal";
+import { exportTransactionsToCSV } from "@/utils/csvExport";
 
 type ViewMode = "operaciones" | "analisis" | "gastos_fijos" | "presupuestos";
 
@@ -513,13 +514,21 @@ export default function Home() {
 
             {currentView === "operaciones" ? (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
-                <div className="flex justify-start mb-4">
+                <div className="flex justify-start mb-4 gap-4">
                   <button
                     onClick={() => setIsModalOpen(true)}
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-primary/20"
                   >
                     <Plus size={18} />
                     Nuevo Movimiento
+                  </button>
+                  <button
+                    onClick={() => exportTransactionsToCSV(transactions)}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-background border border-border hover:bg-muted text-foreground font-semibold rounded-lg transition-colors"
+                    title="Exportar movimientos filtrados"
+                  >
+                    <Download size={18} />
+                    Exportar CSV
                   </button>
                 </div>
                 

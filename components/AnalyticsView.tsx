@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Transaction, TransactionType } from "@/types";
+import MonthlyComparison from "./MonthlyComparison";
 
 interface AnalyticsViewProps {
   transactions: Transaction[];
@@ -20,6 +21,7 @@ export default function AnalyticsView({ transactions }: AnalyticsViewProps) {
   const initialDate = new Date();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("personalizado");
   const [chartType, setChartType] = useState<TransactionType>("gasto");
+  const [activeTab, setActiveTab] = useState<"distribucion" | "comparativa">("distribucion");
   
   // Estados para filtro histórico aislados
   const [selectedMonth, setSelectedMonth] = useState<number | "todos">(initialDate.getMonth());
@@ -119,21 +121,21 @@ export default function AnalyticsView({ transactions }: AnalyticsViewProps) {
 
         {/* Sección de Filtros */}
         <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:w-auto">
-          {/* Filtros rápidos */}
-          <div className="flex flex-wrap gap-2">
-            {(["hoy", "semana", "mes", "ano", "todo"] as TimeFilter[]).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => handleQuickFilter(filter)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
-                  timeFilter === filter
-                    ? "bg-primary text-white"
-                    : "bg-background text-muted hover:text-foreground border border-border"
-                }`}
-              >
-                {filter === "ano" ? "año" : filter}
-              </button>
-            ))}
+          {/* Filtro Rápido (Desplegable) */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground font-medium hidden sm:inline-block">Período:</span>
+            <select
+              value={timeFilter}
+              onChange={(e) => handleQuickFilter(e.target.value as TimeFilter)}
+              className="bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-primary appearance-none min-w-[140px] capitalize transition-colors"
+            >
+              <option value="hoy">Hoy</option>
+              <option value="semana">Esta Semana</option>
+              <option value="mes">Este Mes</option>
+              <option value="ano">Este Año</option>
+              <option value="todo">Histórico Completo</option>
+              <option value="personalizado" disabled hidden>Personalizado</option>
+            </select>
           </div>
 
           <div className="hidden sm:block w-px h-8 bg-border mx-2"></div>
@@ -165,7 +167,28 @@ export default function AnalyticsView({ transactions }: AnalyticsViewProps) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center">
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6">
+        <button
+          onClick={() => setActiveTab("distribucion")}
+          className={`pb-2 px-4 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === "distribucion" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          Distribución
+        </button>
+        <button
+          onClick={() => setActiveTab("comparativa")}
+          className={`pb-2 px-4 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === "comparativa" ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          Comparativa Avanzada
+        </button>
+      </div>
+
+      {activeTab === "distribucion" ? (
+        <div className="flex flex-col items-center animate-in fade-in">
         {/* Toggle Gasto/Ingreso */}
         <div className="flex bg-background rounded-lg p-1 border border-border mb-6">
           <button
@@ -230,6 +253,9 @@ export default function AnalyticsView({ transactions }: AnalyticsViewProps) {
           )}
         </div>
       </div>
+      ) : (
+        <MonthlyComparison />
+      )}
     </div>
   );
 }

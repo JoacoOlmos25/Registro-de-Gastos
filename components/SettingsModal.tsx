@@ -76,8 +76,8 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
           transactionId={categoryToDelete.id}
           transactionDesc={`Categoría: ${categoryToDelete.name}`}
           onClose={() => setCategoryToDelete(null)}
-          onConfirm={(id) => {
-            onDeleteCategory(id);
+          onConfirm={async (id) => {
+            await onDeleteCategory(id);
             setCategoryToDelete(null);
           }}
         />

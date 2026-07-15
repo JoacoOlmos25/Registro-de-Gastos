@@ -1,4 +1,4 @@
-import { Presupuesto, Transaction, Categoria } from "@/types";
+import { Transaction, Presupuesto, Categoria } from "@/types";
 import { Edit2, Trash2, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface BudgetPanelProps {
