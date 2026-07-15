@@ -1,6 +1,6 @@
 import { GastoFijo } from "@/types";
 import { getExpirationStatus } from "@/utils/expenseStatus";
-import { CheckCircle2, CircleDashed, Clock, Trash2, Wallet } from "lucide-react";
+import { CheckCircle2, CircleDashed, Clock, Trash2, Wallet, Edit2 } from "lucide-react";
 import { useState } from "react";
 
 interface FixedExpensesListProps {
@@ -8,6 +8,7 @@ interface FixedExpensesListProps {
   paidGastoFijoIds: string[];
   onPay: (gasto: GastoFijo) => void;
   onDelete: (id: string) => void;
+  onEdit?: (gasto: GastoFijo) => void;
 }
 
 export default function FixedExpensesList({
@@ -15,6 +16,7 @@ export default function FixedExpensesList({
   paidGastoFijoIds,
   onPay,
   onDelete,
+  onEdit,
 }: FixedExpensesListProps) {
   const [payingId, setPayingId] = useState<string | null>(null);
 
@@ -70,13 +72,24 @@ export default function FixedExpensesList({
                 <h3 className="font-bold text-foreground text-lg">{gasto.nombre}</h3>
                 <span className="text-xs text-muted uppercase tracking-wider">{gasto.categoria_nombre}</span>
               </div>
-              <button
-                onClick={() => onDelete(gasto.id)}
-                className="text-muted hover:text-red-500 transition-colors p-1 opacity-0 group-hover:opacity-100"
-                title="Eliminar gasto fijo"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(gasto)}
+                    className="text-muted hover:text-primary transition-colors p-1"
+                    title="Editar gasto fijo"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(gasto.id)}
+                  className="text-muted hover:text-red-500 transition-colors p-1"
+                  title="Eliminar gasto fijo"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
 
             <div className="mb-4">

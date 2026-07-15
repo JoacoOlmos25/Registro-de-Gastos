@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Loader2 } from "lucide-react";
 import { Categoria, Presupuesto } from "@/types";
+import CategorySelectorWithCreate, { CategorySelectorRef } from "./CategorySelectorWithCreate";
 
 interface BudgetFormModalProps {
   categorias: Categoria[];
@@ -8,6 +9,8 @@ interface BudgetFormModalProps {
   editingBudget?: Presupuesto | null;
   onSave: (budget: Partial<Presupuesto>) => Promise<void>;
   onClose: () => void;
+  userId: string | null;
+  onCategoryAdded: (cat: Categoria) => void;
 }
 
 export default function BudgetFormModal({
@@ -16,15 +19,16 @@ export default function BudgetFormModal({
   editingBudget,
   onSave,
   onClose,
+  userId,
+  onCategoryAdded,
 }: BudgetFormModalProps) {
-  const [categoriaId, setCategoriaId] = useState("");
   const [montoLimite, setMontoLimite] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const categorySelectorRef = useRef<CategorySelectorRef>(null);
 
   useEffect(() => {
     if (editingBudget) {
       const updateState = () => {
-        setCategoriaId(editingBudget.categoria_id);
         setMontoLimite(editingBudget.monto_limite.toString());
       };
       updateState();
@@ -33,12 +37,20 @@ export default function BudgetFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoriaId || !montoLimite) return;
+    if (!montoLimite) return;
 
     setIsSubmitting(true);
     try {
+      // Si estamos editando, mantenemos la categoría existente (está bloqueada en la UI).
+      // Si estamos creando, usamos el componente CategorySelectorWithCreate.
+      const catId = editingBudget 
+        ? editingBudget.categoria_id 
+        : await categorySelectorRef.current?.getSelectedCategoryId();
+
+      if (!catId) return;
+
       await onSave({
-        categoria_id: categoriaId,
+        categoria_id: catId,
         monto_limite: parseFloat(montoLimite),
       });
     } finally {
@@ -70,24 +82,25 @@ export default function BudgetFormModal({
       </div>
 
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Categoría
-          </label>
-          <select
-            value={categoriaId}
-            onChange={(e) => setCategoriaId(e.target.value)}
-            disabled={!!editingBudget} // No se puede cambiar la categoría editando
-            required
-            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow disabled:opacity-50"
-          >
-            <option value="" disabled>Selecciona una categoría de gasto</option>
-            {availableCategorias.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.nombre}
-              </option>
-            ))}
-          </select>
+        <div className={editingBudget ? "opacity-50 pointer-events-none" : ""}>
+          {editingBudget ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-foreground">
+                Categoría
+              </label>
+              <select disabled className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none appearance-none">
+                <option>{categorias.find(c => c.id === editingBudget.categoria_id)?.nombre}</option>
+              </select>
+            </div>
+          ) : (
+            <CategorySelectorWithCreate
+              ref={categorySelectorRef}
+              categorias={availableCategorias}
+              tipo="gasto"
+              userId={userId}
+              onCategoryAdded={onCategoryAdded}
+            />
+          )}
           {availableCategorias.length === 0 && !editingBudget && (
             <p className="text-xs text-amber-500 mt-1">
               No hay categorías de gasto disponibles para asignar presupuesto.
@@ -124,7 +137,7 @@ export default function BudgetFormModal({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || (!categoriaId && !editingBudget)}
+            disabled={isSubmitting || (!editingBudget && availableCategorias.length === 0)}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white font-medium rounded-lg hover:bg-emerald-500 transition-colors disabled:opacity-50"
           >
             {isSubmitting ? (

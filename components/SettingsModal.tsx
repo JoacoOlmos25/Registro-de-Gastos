@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { X, Trash2, Settings } from "lucide-react";
-import { Categoria } from "@/types";
+import { Categoria, GastoFijo } from "@/types";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import InactiveFixedExpenses from "./InactiveFixedExpenses";
 
 interface SettingsModalProps {
   categorias: Categoria[];
   onClose: () => void;
   onDeleteCategory: (id: string) => Promise<void>;
   userId: string | null;
+  gastosInactivos: GastoFijo[];
+  onReactivateFixedExpense: (id: string) => void;
+  onDeleteFixedExpensePermanent: (id: string) => void;
 }
 
-export default function SettingsModal({ categorias, onClose, onDeleteCategory, userId }: SettingsModalProps) {
+export default function SettingsModal({ categorias, onClose, onDeleteCategory, userId, gastosInactivos, onReactivateFixedExpense, onDeleteFixedExpensePermanent }: SettingsModalProps) {
   const [categoryToDelete, setCategoryToDelete] = useState<{ id: string, name: string } | null>(null);
 
   // Solo mostrar categorías personalizadas (user_id !== null) y activas
@@ -22,7 +26,7 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md bg-card rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="relative z-10 w-full max-w-2xl bg-card rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-2 text-foreground">
             <Settings size={20} />
@@ -36,7 +40,7 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
           </button>
         </div>
 
-        <div className="p-5 space-y-6">
+        <div className="p-5 space-y-6 overflow-y-auto">
           <section>
             <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">
               Mis Categorías Personalizadas
@@ -47,7 +51,7 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
                 No tienes categorías personalizadas activas.
               </p>
             ) : (
-              <ul className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              <ul className="space-y-2">
                 {customCategories.map(cat => (
                   <li key={cat.id} className="flex items-center justify-between p-3 bg-background rounded-xl border border-border group">
                     <div className="flex items-center gap-3">
@@ -67,6 +71,17 @@ export default function SettingsModal({ categorias, onClose, onDeleteCategory, u
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="pt-6 border-t border-border">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">
+              Suscripciones Canceladas
+            </h3>
+            <InactiveFixedExpenses
+              gastosInactivos={gastosInactivos}
+              onReactivate={onReactivateFixedExpense}
+              onDeletePermanent={onDeleteFixedExpensePermanent}
+            />
           </section>
         </div>
       </div>

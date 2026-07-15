@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Categoria } from "@/types";
+import { useState, useRef } from "react";
+import { Categoria, GastoFijo } from "@/types";
+import CategorySelectorWithCreate, { CategorySelectorRef } from "./CategorySelectorWithCreate";
 
 interface AddFixedExpenseFormProps {
   categorias: Categoria[];
@@ -11,8 +12,17 @@ interface AddFixedExpenseFormProps {
     categoria_id: string;
     dia_vencimiento: number;
   }) => void;
+  onEdit?: (id: string, expense: {
+    nombre: string;
+    monto_estimado: number;
+    categoria_id: string;
+    dia_vencimiento: number;
+  }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
+  initialData?: GastoFijo | null;
+  userId: string | null;
+  onCategoryAdded: (cat: Categoria) => void;
 }
 
 export default function AddFixedExpenseForm({
@@ -20,30 +30,50 @@ export default function AddFixedExpenseForm({
   onAdd,
   onCancel,
   isSubmitting,
+  initialData,
+  onEdit,
+  userId,
+  onCategoryAdded,
 }: AddFixedExpenseFormProps) {
-  const [nombre, setNombre] = useState("");
-  const [montoEstimado, setMontoEstimado] = useState("");
-  const [categoriaId, setCategoriaId] = useState("");
-  const [diaVencimiento, setDiaVencimiento] = useState("");
+  const [nombre, setNombre] = useState(initialData?.nombre || "");
+  const [montoEstimado, setMontoEstimado] = useState(initialData?.monto_estimado?.toString() || "");
+  const [diaVencimiento, setDiaVencimiento] = useState(initialData?.dia_vencimiento?.toString() || "");
+  
+  const categorySelectorRef = useRef<CategorySelectorRef>(null);
 
-  const gastosCategorias = categorias.filter((c) => c.tipo === "gasto");
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre || !montoEstimado || !categoriaId || !diaVencimiento) return;
+    if (!nombre || !montoEstimado || !diaVencimiento) return;
+    
+    try {
+      const catId = await categorySelectorRef.current?.getSelectedCategoryId();
+      if (!catId) return;
 
-    onAdd({
-      nombre,
-      monto_estimado: parseFloat(montoEstimado),
-      categoria_id: categoriaId,
-      dia_vencimiento: parseInt(diaVencimiento),
-    });
+    if (initialData && onEdit) {
+      onEdit(initialData.id, {
+        nombre,
+        monto_estimado: parseFloat(montoEstimado),
+        categoria_id: catId,
+        dia_vencimiento: parseInt(diaVencimiento),
+      });
+    } else {
+      onAdd({
+        nombre,
+        monto_estimado: parseFloat(montoEstimado),
+        categoria_id: catId,
+        dia_vencimiento: parseInt(diaVencimiento),
+      });
+    }
+    } catch (err) {
+      console.error(err);
+      alert("Hubo un error al guardar.");
+    }
   };
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-foreground">Nuevo Gasto Fijo</h2>
+        <h2 className="text-xl font-bold text-foreground">{initialData ? "Editar Gasto Fijo" : "Nuevo Gasto Fijo"}</h2>
         <button
           onClick={onCancel}
           className="text-muted hover:text-foreground transition-colors"
@@ -79,22 +109,14 @@ export default function AddFixedExpenseForm({
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-foreground">Categoría</label>
-            <select
-              required
-              value={categoriaId}
-              onChange={(e) => setCategoriaId(e.target.value)}
-              className="bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-colors appearance-none"
-            >
-              <option value="" disabled>Seleccione una categoría</option>
-              {gastosCategorias.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CategorySelectorWithCreate
+            ref={categorySelectorRef}
+            categorias={categorias}
+            tipo="gasto"
+            userId={userId}
+            onCategoryAdded={onCategoryAdded}
+            defaultCategoryId={initialData?.categoria_id}
+          />
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-foreground">Día de Vencimiento (1-31)</label>
@@ -120,7 +142,7 @@ export default function AddFixedExpenseForm({
             {isSubmitting ? (
               <span className="animate-pulse">Guardando...</span>
             ) : (
-              "Crear Gasto Fijo"
+              initialData ? "Guardar Cambios" : "Crear Gasto Fijo"
             )}
           </button>
         </div>

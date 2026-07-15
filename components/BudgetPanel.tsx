@@ -1,15 +1,14 @@
-import { Transaction, Presupuesto, Categoria } from "@/types";
+import { Transaction, Presupuesto } from "@/types";
 import { Edit2, Trash2, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface BudgetPanelProps {
   budgets: Presupuesto[];
   transactions: Transaction[];
-  categorias: Categoria[];
   onEdit: (budget: Presupuesto) => void;
   onDelete: (id: string) => void;
 }
 
-export default function BudgetPanel({ budgets, transactions, categorias, onEdit, onDelete }: BudgetPanelProps) {
+export default function BudgetPanel({ budgets, transactions, onEdit, onDelete }: BudgetPanelProps) {
   if (budgets.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl p-8 text-center text-muted animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -20,8 +19,53 @@ export default function BudgetPanel({ budgets, transactions, categorias, onEdit,
     );
   }
 
+  const totalPresupuestado = budgets.reduce((acc, b) => acc + b.monto_limite, 0);
+  
+  const budgetedCategoryIds = budgets.map(b => b.categoria_id);
+  const totalGastado = transactions
+    .filter(t => t.tipo === "gasto" && t.categoria_id && budgetedCategoryIds.includes(t.categoria_id))
+    .reduce((acc, t) => acc + Number(t.monto), 0);
+    
+  const globalPercentage = totalPresupuestado > 0 ? (totalGastado / totalPresupuestado) * 100 : 0;
+  
+  let globalBarBg = "bg-emerald-500";
+  let globalTextColor = "text-emerald-600 dark:text-emerald-400";
+  if (globalPercentage >= 100) {
+    globalBarBg = "bg-red-500";
+    globalTextColor = "text-red-600 dark:text-red-400";
+  } else if (globalPercentage >= 80) {
+    globalBarBg = "bg-amber-500";
+    globalTextColor = "text-amber-600 dark:text-amber-400";
+  }
+  
+  const globalClampedPercentage = Math.min(globalPercentage, 100);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm animate-in zoom-in-95 duration-300">
+        <h3 className="text-sm text-muted font-medium mb-3">Total en Presupuestos</h3>
+        <div className="flex justify-between items-end mb-2">
+          <span className="text-3xl font-bold text-foreground">
+            ${totalGastado.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className="text-sm font-medium text-muted mb-1">
+            de ${totalPresupuestado.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} presupuestado
+          </span>
+        </div>
+        <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+          <div 
+            className={`h-3 rounded-full transition-all duration-500 ${globalBarBg}`} 
+            style={{ width: `${globalClampedPercentage}%` }}
+          ></div>
+        </div>
+        <div className="mt-2 text-right">
+          <span className={`text-sm font-semibold ${globalTextColor}`}>
+            {globalPercentage.toFixed(1)}% global consumido
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {budgets.map((budget) => {
         // Calcular lo gastado
         const consumed = transactions
@@ -110,6 +154,7 @@ export default function BudgetPanel({ budgets, transactions, categorias, onEdit,
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

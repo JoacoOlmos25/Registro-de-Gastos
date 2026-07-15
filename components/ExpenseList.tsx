@@ -1,12 +1,13 @@
-import { ReceiptText, ArrowUpRight, ArrowDownRight, Trash2 } from "lucide-react";
+import { ReceiptText, ArrowUpRight, ArrowDownRight, Trash2, Edit2 } from "lucide-react";
 import { Transaction } from "@/types";
 
 interface ExpenseListProps {
   transactions: Transaction[];
+  onEditRequest?: (transaction: Transaction) => void;
   onDeleteRequest?: (id: string, desc: string) => void;
 }
 
-export default function ExpenseList({ transactions, onDeleteRequest }: ExpenseListProps) {
+export default function ExpenseList({ transactions, onEditRequest, onDeleteRequest }: ExpenseListProps) {
   if (transactions.length === 0) {
     return (
       <div className="bg-card p-6 rounded-xl shadow-lg border border-border text-center">
@@ -34,9 +35,9 @@ export default function ExpenseList({ transactions, onDeleteRequest }: ExpenseLi
                 <span className="text-foreground font-medium flex items-center gap-2">
                   {transaction.descripcion}
                   {isIncome ? (
-                    <ArrowUpRight size={16} className="text-primary" />
+                    <ArrowUpRight size={16} className="text-emerald-500" />
                   ) : (
-                    <ArrowDownRight size={16} className="text-muted" />
+                    <ArrowDownRight size={16} className="text-rose-500" />
                   )}
                 </span>
                 <span className="text-sm text-muted flex items-center gap-2 mt-1">
@@ -53,7 +54,17 @@ export default function ExpenseList({ transactions, onDeleteRequest }: ExpenseLi
                 <div className={`text-lg font-bold ${isIncome ? "text-primary" : "text-foreground"}`}>
                   {isIncome ? "+" : "-"}${Number(transaction.monto).toFixed(2)}
                 </div>
-                {onDeleteRequest && (
+                <div className="flex items-center gap-1">
+                  {onEditRequest && (
+                    <button
+                      onClick={() => onEditRequest(transaction)}
+                      className="p-2 text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      title="Editar movimiento"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                  )}
+                  {onDeleteRequest && (
                   <button
                     onClick={() => onDeleteRequest(transaction.id, transaction.descripcion || "Movimiento sin descripción")}
                     className="p-2 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
@@ -62,6 +73,7 @@ export default function ExpenseList({ transactions, onDeleteRequest }: ExpenseLi
                     <Trash2 size={18} />
                   </button>
                 )}
+                </div>
               </div>
             </div>
           );

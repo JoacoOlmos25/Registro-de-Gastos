@@ -3,23 +3,28 @@
 import { PlusCircle, X, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Transaction, TransactionType, Categoria } from "@/types";
-import { createClient } from "@/lib/supabase/client";
+import CategorySelectorWithCreate, { CategorySelectorRef } from "./CategorySelectorWithCreate";
+import { useRef } from "react";
 
 interface ExpenseFormProps {
   categorias: Categoria[];
   userId: string | null;
   onCategoryAdded: (cat: Categoria) => void;
   onAddTransaction: (transaction: Partial<Transaction> & { categoria_id: string, monto: number, fecha: string, descripcion: string, tipo: TransactionType }) => void;
+  onEditTransaction?: (id: string, transaction: Partial<Transaction>) => void;
   onClose: () => void;
+  initialData?: Transaction | null;
 }
 
-export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAddTransaction, onClose }: ExpenseFormProps) {
-  const [tipo, setTipo] = useState<TransactionType | null>(null);
-  const [isNuevaCategoria, setIsNuevaCategoria] = useState(false);
-  const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState("");
+const getLocalDateString = () => {
+  const offset = new Date().getTimezoneOffset();
+  return new Date(Date.now() - offset * 60000).toISOString().split('T')[0];
+};
+
+export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAddTransaction, onEditTransaction, onClose, initialData }: ExpenseFormProps) {
+  const [tipo, setTipo] = useState<TransactionType | null>(initialData?.tipo || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const supabase = createClient();
+  const categorySelectorRef = useRef<CategorySelectorRef>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,24 +32,10 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
     const formData = new FormData(e.currentTarget);
     
     try {
-      let catId = formData.get("categoria_id") as string;
+      const catId = await categorySelectorRef.current?.getSelectedCategoryId();
       
-      if (catId === "nueva") {
-        const { data: newCat, error: catError } = await supabase
-          .from("categorias")
-          .insert({
-            nombre: nuevaCategoriaNombre,
-            tipo: tipo,
-            user_id: userId,
-            es_predeterminada: false
-          })
-          .select()
-          .single();
-          
-        if (catError) throw catError;
-        
-        catId = newCat.id;
-        onCategoryAdded(newCat);
+      if (!catId) {
+        throw new Error("No se pudo obtener la categoría.");
       }
 
       const newTransaction = {
@@ -55,7 +46,11 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
         tipo: tipo!,
       };
 
-      await onAddTransaction(newTransaction);
+      if (initialData && onEditTransaction) {
+        await onEditTransaction(initialData.id, newTransaction);
+      } else {
+        await onAddTransaction(newTransaction);
+      }
     } catch (error) {
       console.error("Error en submit:", error);
       alert("Hubo un error al guardar.");
@@ -102,15 +97,14 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
             <div>
               <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
                 <PlusCircle size={24} />
-                {tipo === "ingreso" ? "Registrar Ingreso" : "Registrar Gasto"}
+                {initialData ? (tipo === "ingreso" ? "Editar Ingreso" : "Editar Gasto") : (tipo === "ingreso" ? "Registrar Ingreso" : "Registrar Gasto")}
               </h2>
               <button 
                 type="button" 
                 onClick={() => {
                   setTipo(null);
-                  setIsNuevaCategoria(false);
                 }} 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card text-muted border border-border hover:bg-background hover:text-foreground transition-colors text-sm font-medium mt-2"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card text-muted border border-border hover:bg-background hover:text-foreground transition-colors text-sm font-medium mt-2 ${initialData ? "hidden" : ""}`}
               >
                 Volver
               </button>
@@ -130,45 +124,19 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
                   step="0.01"
                   required
                   placeholder="0.00"
+                  defaultValue={initialData?.monto || ""}
                   className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="categoria_id" className="block text-sm font-medium text-muted">
-                  Categoría
-                </label>
-                <select
-                  id="categoria_id"
-                  name="categoria_id"
-                  required
-                  defaultValue=""
-                  onChange={(e) => setIsNuevaCategoria(e.target.value === "nueva")}
-                  className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors appearance-none"
-                >
-                  <option value="" disabled>Selecciona una categoría</option>
-                  {categorias.filter((c) => c.tipo === tipo).map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nombre}
-                    </option>
-                  ))}
-                  <option value="nueva" className="text-primary font-semibold">
-                    + Crear nueva categoría...
-                  </option>
-                </select>
-                {isNuevaCategoria && (
-                  <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Nombre de la nueva categoría"
-                      value={nuevaCategoriaNombre}
-                      onChange={(e) => setNuevaCategoriaNombre(e.target.value)}
-                      className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                    />
-                  </div>
-                )}
-              </div>
+              <CategorySelectorWithCreate
+                ref={categorySelectorRef}
+                categorias={categorias}
+                tipo={tipo!}
+                userId={userId}
+                onCategoryAdded={onCategoryAdded}
+                defaultCategoryId={initialData?.categoria_id}
+              />
 
               <div className="space-y-2">
                 <label htmlFor="fecha" className="block text-sm font-medium text-muted">
@@ -179,6 +147,7 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
                   id="fecha"
                   name="fecha"
                   required
+                  defaultValue={initialData?.fecha || getLocalDateString()}
                   className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 />
               </div>
@@ -191,6 +160,7 @@ export default function ExpenseForm({ categorias, userId, onCategoryAdded, onAdd
                   type="text"
                   id="descripcion"
                   name="descripcion"
+                  defaultValue={initialData?.descripcion || ""}
                   placeholder={tipo === "gasto" ? "Ej. Cena con amigos" : "Ej. Pago de quincena"}
                   className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 />
